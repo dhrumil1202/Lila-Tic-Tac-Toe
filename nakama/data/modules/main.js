@@ -1067,6 +1067,87 @@ function rpcGetLeaderboard(ctx, logger, nk, payload) {
 	});
 }
 
+var ADMIN_USERNAME = "lila_admin";
+
+function rpcAdminListUsers(ctx, logger, nk, payload) {
+	var callerUsername = ctx.username || "";
+	if (callerUsername !== ADMIN_USERNAME) {
+		throw new Error("Not authorized.");
+	}
+
+	var users = [];
+	var cursor = null;
+
+	try {
+		do {
+			var result = nk.storageList(null, PLAYER_STATS_COLLECTION, 100, cursor || "");
+			var objects = result.items || result.objects || [];
+
+			for (var i = 0; i < objects.length; i += 1) {
+				var obj = objects[i];
+				var uid = obj.userId || obj.user_id || "";
+				if (uid) {
+					var stats = parseStatsValue(obj.value) || getDefaultStats();
+					users.push({ userId: uid, stats: stats });
+				}
+			}
+
+			cursor = result.cursor || null;
+		} while (cursor);
+	} catch (listError) {
+		debugLog(logger, "admin_list_users storageList failed reason=" + listError.message);
+	}
+
+	if (users.length > 0) {
+		var userIds = [];
+		for (var j = 0; j < users.length; j += 1) {
+			userIds.push(users[j].userId);
+		}
+
+		try {
+			var nakamaUsers = nk.usersGetId(userIds);
+			var usernameMap = {};
+			for (var k = 0; k < nakamaUsers.length; k += 1) {
+				var nu = nakamaUsers[k];
+				var mappedUserId = nu.id || nu.user_id || nu.userId || "";
+				if (mappedUserId) {
+					usernameMap[mappedUserId] = nu.username || mappedUserId;
+				}
+			}
+			for (var m = 0; m < users.length; m += 1) {
+				users[m].username = usernameMap[users[m].userId] || users[m].userId;
+			}
+		} catch (lookupError) {
+			// Username lookup failed; IDs are still returned.
+		}
+	}
+
+	return JSON.stringify({ users: users });
+}
+
+function rpcAdminDeleteUser(ctx, logger, nk, payload) {
+	var callerUsername = ctx.username || "";
+	if (callerUsername !== ADMIN_USERNAME) {
+		throw new Error("Not authorized.");
+	}
+
+	var data = {};
+	try {
+		data = JSON.parse(payload || "{}");
+	} catch (parseError) {
+		data = {};
+	}
+
+	var userId = data.userId || "";
+	if (!userId) {
+		throw new Error("userId is required.");
+	}
+
+	nk.accountDeleteId(userId, false);
+
+	return JSON.stringify({ status: "ok", deleted: userId });
+}
+
 function rpcEnsurePlayerStats(ctx, logger, nk, payload) {
 	var userId = ctx.userId || ctx.user_id || "";
 
@@ -1132,6 +1213,8 @@ function InitModule(ctx, logger, nk, initializer) {
 	initializer.registerRpc("cancel_matchmaking", rpcCancelMatchmaking);
 	initializer.registerRpc("get_leaderboard", rpcGetLeaderboard);
 	initializer.registerRpc("ensure_player_stats", rpcEnsurePlayerStats);
+	initializer.registerRpc("admin_list_users", rpcAdminListUsers);
+	initializer.registerRpc("admin_delete_user", rpcAdminDeleteUser);
 	initializer.registerMatchmakerMatched(matchmakerMatched);
 
 	logger.info("Tic-Tac-Toe modules loaded.");

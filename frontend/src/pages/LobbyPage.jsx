@@ -50,7 +50,7 @@ function toUserMessage(error) {
   return "Something went wrong while searching for a match. Please try again.";
 }
 
-export default function LobbyPage({ session, setPage, setMatchId, setSocket, setPlayerName, setSession }) {
+export default function LobbyPage({ session, playerName, setPage, setMatchId, setSocket, setPlayerName, setSession }) {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedMode, setSelectedMode] = useState("classic");
   const [error, setError] = useState("");

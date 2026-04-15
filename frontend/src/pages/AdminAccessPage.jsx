@@ -1,8 +1,7 @@
 import { useState } from "react";
-import {
-  authenticateWithPassword,
-  normalizeUsername,
-} from "../nakama/client";
+import { authenticateWithPassword } from "../nakama/client";
+
+const ADMIN_USERNAME = "lila_admin";
 
 function toFriendlyAuthError(authError) {
   const message = String(authError?.message || "");
@@ -21,56 +20,24 @@ function toFriendlyAuthError(authError) {
     return "Could not reach authentication service. Please try again in a few seconds.";
   }
 
-  if (lower.includes("device-only account") || lower.includes("another device/browser")) {
-    return "This username is tied to a device-only account on another device/browser. Use that original device, or set a password there to use this account everywhere.";
-  }
-
-  if (lower.includes("already exists on another account")) {
-    return "This username is already linked elsewhere. Use its original password.";
-  }
-
-  if (lower.includes("username already exists") || lower.includes("choose another username")) {
-    return "This username already exists. Use the original password or try another username.";
-  }
-
-  if (lower.includes("username") && (lower.includes("already") || lower.includes("exists") || lower.includes("in use"))) {
-    return "That username is already taken. Please choose another one.";
-  }
-
-  if (lower.includes("username") && (lower.includes("invalid") || lower.includes("must"))) {
-    return "Invalid username. Use letters, numbers, underscore, dash, or dot.";
-  }
-
-  if (lower.includes("invalid credentials") || lower.includes("password")) {
-    return "Invalid username/password. Please try again.";
+  if (lower.includes("invalid") || lower.includes("password")) {
+    return "Invalid admin password.";
   }
 
   if (lower.includes("at least 8 characters")) {
     return "Password must be at least 8 characters.";
   }
 
-  return message || "Authentication failed.";
+  return message || "Admin authentication failed.";
 }
 
-export default function LoginPage({
-  playerName,
-  setPlayerName,
-  setPage,
-  setSession,
-}) {
+export default function AdminAccessPage({ setPage, setSession, setPlayerName }) {
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [password, setPassword] = useState("");
 
   async function handleSubmit(event) {
     event.preventDefault();
-
-    const displayName = normalizeUsername(playerName);
-
-    if (!displayName) {
-      setError("Username is required.");
-      return;
-    }
 
     if (!password) {
       setError("Password is required.");
@@ -81,10 +48,10 @@ export default function LoginPage({
     setError("");
 
     try {
-      const result = await authenticateWithPassword(displayName, password);
+      const result = await authenticateWithPassword(ADMIN_USERNAME, password);
       setSession(result.session);
       setPlayerName(result.username);
-      setPage("lobby");
+      setPage("admin");
     } catch (authError) {
       setError(toFriendlyAuthError(authError));
     } finally {
@@ -96,38 +63,34 @@ export default function LoginPage({
     <main style={styles.page}>
       <section style={styles.card}>
         <p style={styles.kicker}>Lila Tic-Tac-Toe</p>
-        <h1 style={styles.title}>Login</h1>
-        <p style={styles.subtitle}>Pick your player name and jump into live matches.</p>
+        <h1 style={styles.title}>Admin Access</h1>
+        <p style={styles.subtitle}>Enter admin password to continue.</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label htmlFor="displayName" style={styles.label}>Username</label>
-        <input
-          id="displayName"
-          type="text"
-          value={playerName}
-          onChange={(event) => setPlayerName(event.target.value)}
-          placeholder="Enter username (e.g. lila_player_1)"
-          disabled={isLoading}
-          style={styles.input}
-        />
-          <label htmlFor="password" style={styles.label}>Password</label>
+          <label htmlFor="adminPassword" style={styles.label}>Admin Password</label>
           <input
-            id="password"
+            id="adminPassword"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Enter password (min 8 characters)"
+            placeholder="Enter admin password"
             disabled={isLoading}
             style={styles.input}
           />
+
           <button type="submit" disabled={isLoading} style={styles.button}>
-            {isLoading ? "Authenticating..." : "Login / Register"}
+            {isLoading ? "Authenticating..." : "Enter Admin"}
           </button>
         </form>
 
-        <p style={styles.hint}>
-          Password is required so you can reuse the same account across devices.
-        </p>
+        <button
+          type="button"
+          style={styles.backButton}
+          onClick={() => setPage("login")}
+          disabled={isLoading}
+        >
+          Back to Player Login
+        </button>
 
         {error ? (
           <p role="alert" style={styles.error}>
@@ -168,6 +131,7 @@ const styles = {
     margin: "8px 0 8px",
     fontSize: "clamp(1.65rem, 4.5vw, 2.35rem)",
     lineHeight: 1.08,
+    color: "#edf2ff",
   },
   subtitle: {
     margin: "0 0 18px",
@@ -200,10 +164,15 @@ const styles = {
     padding: "12px 14px",
     marginTop: "6px",
   },
-  hint: {
-    margin: "12px 0 0",
-    color: "#a9bdfc",
-    fontSize: "0.88rem",
+  backButton: {
+    marginTop: "10px",
+    width: "100%",
+    borderRadius: "12px",
+    border: "1px solid rgba(162, 181, 255, 0.4)",
+    background: "rgba(72, 97, 188, 0.2)",
+    color: "#cedaff",
+    cursor: "pointer",
+    padding: "10px 12px",
   },
   error: {
     margin: "12px 0 0",

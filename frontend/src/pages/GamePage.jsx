@@ -139,7 +139,12 @@ export default function GamePage({ socket, matchId, session, setPage }) {
     }
 
     var previousHandler = socket.onmatchdata;
+    var previousDisconnectHandler = socket.ondisconnect;
     console.info("[DBG][Game] Listening for match data", { matchId });
+
+    socket.ondisconnect = function ondisconnect() {
+      setToastMessage("Connection lost. Please return to lobby and rejoin.");
+    };
 
     socket.onmatchdata = function onmatchdata(message) {
       var incomingMatchId = getMessageMatchId(message);
@@ -219,6 +224,7 @@ export default function GamePage({ socket, matchId, session, setPage }) {
     return function cleanup() {
       console.info("[DBG][Game] Cleaning up match data listener", { matchId });
       socket.onmatchdata = previousHandler;
+      socket.ondisconnect = previousDisconnectHandler;
     };
   }, [socket, matchId, session, setPage]);
 

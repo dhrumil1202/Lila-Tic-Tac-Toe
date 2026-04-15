@@ -211,6 +211,14 @@ function getOrCreateDeviceId() {
   return id;
 }
 
+async function ensurePlayerStats(session) {
+  try {
+    await client.rpc(session, "ensure_player_stats", JSON.stringify({}));
+  } catch (error) {
+    // Non-fatal: gameplay and auth must continue even if stats init RPC fails.
+  }
+}
+
 export async function authenticateDevice(displayName) {
   const deviceId = getOrCreateDeviceId();
   const username = normalizeUsername(displayName);
@@ -220,9 +228,20 @@ export async function authenticateDevice(displayName) {
   }
 
   // First auth creates account for new device ids.
-  const initialSession = await client.authenticateDevice(deviceId, true, username, {
-    displayName: username,
-  });
+  let initialSession = null;
+  try {
+    initialSession = await client.authenticateDevice(deviceId, true, username, {
+      displayName: username,
+    });
+  } catch (error) {
+    if (isUsernameTakenError(error)) {
+      throw new Error(
+        "This username is linked to a device-only account on another device/browser. Use the original device, or set a password there to use this account everywhere."
+      );
+    }
+
+    throw error;
+  }
 
   const account = await client.getAccount(initialSession);
   const currentUsername = normalizeUsername(account?.user?.username);
@@ -241,6 +260,7 @@ export async function authenticateDevice(displayName) {
 
   // Save encrypted session to localStorage (no stats data)
   await saveSessionToStorage(refreshedSession, username);
+  await ensurePlayerStats(refreshedSession);
 
   return {
     session: refreshedSession,
@@ -275,6 +295,40 @@ function isInvalidCredentialsError(error) {
   return message.includes("invalid") && message.includes("credential");
 }
 
+function isTransientAuthError(error) {
+  var message = String(error?.message || "").toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("temporarily unavailable") ||
+    message.includes("service unavailable") ||
+    message.includes("connection reset") ||
+    message.includes("502") ||
+    message.includes("503") ||
+    message.includes("504")
+  );
+}
+
+async function retryTransientAuth(operation, maxAttempts) {
+  var attempts = typeof maxAttempts === "number" ? maxAttempts : 2;
+  var lastError = null;
+
+  for (var i = 0; i < attempts; i += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientAuthError(error) || i === attempts - 1) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error("Authentication failed.");
+}
+
 export async function authenticateWithPassword(displayName, password) {
   const username = normalizeUsername(displayName);
   const secret = String(password || "");
@@ -295,9 +349,11 @@ export async function authenticateWithPassword(displayName, password) {
   let session = null;
 
   try {
-    session = await client.authenticateEmail(email, secret, false, username, {
-      displayName: username,
-    });
+    session = await retryTransientAuth(function () {
+      return client.authenticateEmail(email, secret, false, username, {
+        displayName: username,
+      });
+    }, 2);
   } catch (loginError) {
     if (isInvalidCredentialsError(loginError)) {
       throw new Error("Invalid username/password.");
@@ -308,9 +364,11 @@ export async function authenticateWithPassword(displayName, password) {
     }
 
     try {
-      session = await client.authenticateEmail(email, secret, true, username, {
-        displayName: username,
-      });
+      session = await retryTransientAuth(function () {
+        return client.authenticateEmail(email, secret, true, username, {
+          displayName: username,
+        });
+      }, 2);
     } catch (createError) {
       if (!isUsernameTakenError(createError)) {
         throw createError;
@@ -321,12 +379,14 @@ export async function authenticateWithPassword(displayName, password) {
       let deviceSession = null;
 
       try {
-        deviceSession = await client.authenticateDevice(deviceId, false, username, {
-          displayName: username,
-        });
+        deviceSession = await retryTransientAuth(function () {
+          return client.authenticateDevice(deviceId, false, username, {
+            displayName: username,
+          });
+        }, 2);
       } catch (deviceError) {
         throw new Error(
-          "This username already exists on another account. Use the original password for this username."
+          "Username already exists. Use the original password for this username, or choose another username."
         );
       }
 
@@ -335,7 +395,7 @@ export async function authenticateWithPassword(displayName, password) {
 
       if (deviceUsername !== username) {
         throw new Error(
-          "This username already exists on another account. Use the original password for this username."
+          "Username already exists. Use the original password for this username, or choose another username."
         );
       }
 
@@ -346,9 +406,11 @@ export async function authenticateWithPassword(displayName, password) {
         display_name: username,
       });
 
-      session = await client.authenticateEmail(email, secret, false, username, {
-        displayName: username,
-      });
+      session = await retryTransientAuth(function () {
+        return client.authenticateEmail(email, secret, false, username, {
+          displayName: username,
+        });
+      }, 2);
     }
   }
 
@@ -362,12 +424,15 @@ export async function authenticateWithPassword(displayName, password) {
     });
   }
 
-  const refreshedSession = await client.authenticateEmail(email, secret, false, username, {
-    displayName: username,
-  });
+  const refreshedSession = await retryTransientAuth(function () {
+    return client.authenticateEmail(email, secret, false, username, {
+      displayName: username,
+    });
+  }, 2);
 
   // Save encrypted session to localStorage (no stats data)
   await saveSessionToStorage(refreshedSession, username);
+  await ensurePlayerStats(refreshedSession);
 
   return {
     session: refreshedSession,
