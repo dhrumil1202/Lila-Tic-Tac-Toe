@@ -241,30 +241,7 @@ function writeStats(nk, userId, stats) {
 	}
 }
 
-function getLeaderboardWinsForUser(nk, userId) {
-	if (!userId) {
-		return 0;
-	}
-
-	try {
-		var result = nk.leaderboardRecordsList(WINS_LEADERBOARD_ID, [userId], 1, null, null);
-		var records = result && result.records ? result.records : [];
-		if (records.length === 0) {
-			return 0;
-		}
-
-		var score = records[0].score;
-		if (typeof score === "number") {
-			return score;
-		}
-	} catch (error) {
-		return 0;
-	}
-
-	return 0;
-}
-
-function updatePlayerStatsForResult(nk, logger, state, winnerSymbol, xOldLeaderboardWins, oOldLeaderboardWins) {
+function updatePlayerStatsForResult(nk, logger, state, winnerSymbol) {
 	var playerX = state.players.X;
 	var playerO = state.players.O;
 
@@ -275,15 +252,6 @@ function updatePlayerStatsForResult(nk, logger, state, winnerSymbol, xOldLeaderb
 	var statsByUser = readStatsByUserIds(nk, [playerX.userId, playerO.userId]);
 	var xStats = statsByUser[playerX.userId] || getDefaultStats();
 	var oStats = statsByUser[playerO.userId] || getDefaultStats();
-
-	// Backfill from leaderboard only if user has no local stats and has leaderboard entries
-	if (xStats.wins === 0 && xStats.losses === 0 && xStats.bestWinStreak === 0 && xOldLeaderboardWins > 0) {
-		xStats.wins = xOldLeaderboardWins;
-	}
-
-	if (oStats.wins === 0 && oStats.losses === 0 && oStats.bestWinStreak === 0 && oOldLeaderboardWins > 0) {
-		oStats.wins = oOldLeaderboardWins;
-	}
 
 	if (winnerSymbol === "X") {
 		xStats.wins += 1;
@@ -341,10 +309,6 @@ function updateLeaderboardForResult(nk, logger, state, winnerSymbol) {
 	var xIncrement = winnerSymbol === "X" ? 1 : 0;
 	var oIncrement = winnerSymbol === "O" ? 1 : 0;
 
-	// Read leaderboard scores BEFORE incrementing for accurate backfill
-	var xOldLeaderboardWins = playerX ? getLeaderboardWinsForUser(nk, playerX.userId) : 0;
-	var oOldLeaderboardWins = playerO ? getLeaderboardWinsForUser(nk, playerO.userId) : 0;
-
 	debugLog(
 		logger,
 		"leaderboard update result winner=" +
@@ -357,7 +321,7 @@ function updateLeaderboardForResult(nk, logger, state, winnerSymbol) {
 
 	writeWinsRecord(nk, logger, playerX, xIncrement);
 	writeWinsRecord(nk, logger, playerO, oIncrement);
-	updatePlayerStatsForResult(nk, logger, state, winnerSymbol, xOldLeaderboardWins, oOldLeaderboardWins);
+	updatePlayerStatsForResult(nk, logger, state, winnerSymbol);
 }
 
 function decodePayloadString(data) {
@@ -1019,31 +983,8 @@ function rpcGetLeaderboard(ctx, logger, nk, payload) {
 		});
 	}
 
-	// Deduplicate by display name — merge stats for accounts sharing the same username
-	// (can happen when a user created both a device-auth and a password-auth account).
-	var seen = {};
-	var deduped = [];
-	for (var di = 0; di < top.length; di += 1) {
-		var entry = top[di];
-		var nameKey = (entry.displayName || "").toLowerCase();
-		if (seen[nameKey] !== undefined) {
-			// Merge into the existing entry: sum wins/losses, keep higher streaks
-			var existing = deduped[seen[nameKey]];
-			existing.wins += entry.wins;
-			existing.losses += entry.losses;
-			if (entry.winStreak > existing.winStreak) {
-				existing.winStreak = entry.winStreak;
-			}
-			if (entry.bestWinStreak > existing.bestWinStreak) {
-				existing.bestWinStreak = entry.bestWinStreak;
-			}
-			existing.score += entry.score;
-		} else {
-			seen[nameKey] = deduped.length;
-			deduped.push(entry);
-		}
-	}
-	top = deduped;
+	// Keep one row per account record. Do not merge by displayName because
+	// it can inflate wins/losses when historical accounts reused the same username.
 
 	// Sort by wins descending (most wins first)
 	top.sort(function (a, b) {
