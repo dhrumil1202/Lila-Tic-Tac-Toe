@@ -1130,26 +1130,62 @@ function rpcAdminListUsers(ctx, logger, nk, payload) {
 }
 
 function rpcAdminDeleteUser(ctx, logger, nk, payload) {
+	var traceId = "no-trace";
+	var rawPayload = payload || "{}";
+	debugLog(logger, "admin_delete_user start rawPayload=" + rawPayload);
+
 	var callerUsername = ctx.username || "";
 	if (callerUsername !== ADMIN_USERNAME) {
+		debugLog(logger, "admin_delete_user unauthorized caller=" + callerUsername);
 		throw new Error("Not authorized.");
 	}
 
 	var data = {};
 	try {
-		data = JSON.parse(payload || "{}");
+		data = JSON.parse(rawPayload);
+		// Some clients send RPC payload as a JSON-encoded string (e.g. "\"{...}\"").
+		if (typeof data === "string") {
+			data = JSON.parse(data || "{}");
+		}
 	} catch (parseError) {
+		debugLog(logger, "admin_delete_user parse-failed reason=" + (parseError && parseError.message ? parseError.message : "unknown"));
 		data = {};
 	}
 
+	traceId = data.traceId || "no-trace";
+	debugLog(logger, "admin_delete_user parsed traceId=" + traceId);
+
 	var userId = data.userId || "";
 	if (!userId) {
+		debugLog(logger, "admin_delete_user missing-userId traceId=" + traceId);
 		throw new Error("userId is required.");
 	}
 
-	nk.accountDeleteId(userId, false);
+	debugLog(logger, "admin_delete_user validate-userId traceId=" + traceId + " userId=" + userId);
 
-	return JSON.stringify({ status: "ok", deleted: userId });
+	if (!/^[0-9a-fA-F-]{36}$/.test(userId)) {
+		debugLog(logger, "admin_delete_user invalid-userId-format traceId=" + traceId + " userId=" + userId);
+		throw new Error("Invalid userId format.");
+	}
+
+	var existingUsers = nk.usersGetId([userId]) || [];
+	debugLog(logger, "admin_delete_user lookup traceId=" + traceId + " found=" + existingUsers.length);
+	if (!existingUsers.length) {
+		debugLog(logger, "admin_delete_user user-not-found traceId=" + traceId + " userId=" + userId);
+		throw new Error("User not found.");
+	}
+
+	try {
+		debugLog(logger, "admin_delete_user delete-attempt traceId=" + traceId + " userId=" + userId);
+		nk.accountDeleteId(userId, false);
+		debugLog(logger, "admin_delete_user delete-success traceId=" + traceId + " userId=" + userId);
+	} catch (deleteError) {
+		var reason = deleteError && deleteError.message ? deleteError.message : "delete failed";
+		debugLog(logger, "admin_delete_user delete-failed traceId=" + traceId + " userId=" + userId + " reason=" + reason);
+		throw new Error("Could not delete user: " + reason);
+	}
+
+	return JSON.stringify({ status: "ok", deleted: userId, traceId: traceId });
 }
 
 function rpcEnsurePlayerStats(ctx, logger, nk, payload) {

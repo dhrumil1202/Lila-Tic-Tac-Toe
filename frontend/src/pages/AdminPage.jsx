@@ -3,6 +3,62 @@ import client from "../nakama/client";
 
 const ADMIN_USERNAME = "lila_admin";
 
+function toDeleteErrorMessage(err) {
+  if (!err) {
+    return "Unknown error";
+  }
+
+  const direct = String(err?.message || "").trim();
+  if (direct) {
+    return direct;
+  }
+
+  if (typeof err === "string" && err.trim()) {
+    return err.trim();
+  }
+
+  const responseBody = err?.response?.body || err?.body || err?.payload || "";
+  if (typeof responseBody === "string" && responseBody.trim()) {
+    try {
+      const parsed = JSON.parse(responseBody);
+      const parsedMessage =
+        parsed?.message ||
+        parsed?.error ||
+        parsed?.details ||
+        "";
+      if (String(parsedMessage || "").trim()) {
+        return String(parsedMessage).trim();
+      }
+    } catch {
+      return responseBody.trim();
+    }
+  }
+
+  const nested =
+    err?.response?.message ||
+    err?.response?.error ||
+    err?.error_description ||
+    err?.statusText ||
+    err?.error ||
+    "";
+
+  const nestedMessage = String(nested || "").trim();
+  if (nestedMessage) {
+    return nestedMessage;
+  }
+
+  const statusCode = err?.statusCode || err?.status || err?.response?.status;
+  if (statusCode) {
+    return `Request failed (${statusCode}).`;
+  }
+
+  return "Unknown error";
+}
+
+function generateTraceId() {
+  return `del_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export default function AdminPage({ session, playerName, setPage }) {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,18 +100,85 @@ export default function AdminPage({ session, playerName, setPage }) {
     if (!window.confirm(`Delete user "${username}"? This cannot be undone.`)) {
       return;
     }
+
+    const traceId = generateTraceId();
+    const requestPayload = { userId, traceId };
+    console.log("[ADMIN_DELETE] click", {
+      traceId,
+      username,
+      userId,
+      playerName,
+      sessionUserId: session?.user_id || session?.userId || "",
+      requestPayload,
+    });
+
     setDeletingId(userId);
     setStatusMessage("");
     try {
-      await client.rpc(session, "admin_delete_user", JSON.stringify({ userId }));
-      setStatusMessage(`Deleted "${username}" successfully.`);
+      const rpcResult = await client.rpc(session, "admin_delete_user", JSON.stringify(requestPayload));
+      let responseTraceId = traceId;
+      if (typeof rpcResult?.payload === "string" && rpcResult.payload.trim()) {
+        try {
+          const parsed = JSON.parse(rpcResult.payload);
+          responseTraceId = parsed?.traceId || responseTraceId;
+        } catch {
+          // Ignore parse errors; keep request traceId.
+        }
+      }
+      console.log("[ADMIN_DELETE] rpc-success", {
+        traceId,
+        rawPayload: rpcResult?.payload,
+      });
+
+      setStatusMessage(`Deleted "${username}" successfully. (traceId: ${responseTraceId})`);
       setUsers(function (prev) {
         return prev.filter(function (u) {
           return u.userId !== userId;
         });
       });
     } catch (err) {
-      setStatusMessage(`Failed to delete "${username}": ${err?.message || "Unknown error"}`);
+      let detailedMessage = toDeleteErrorMessage(err);
+
+      // Nakama JS may expose failed fetch response as err.error (Response object).
+      if (
+        err?.error &&
+        typeof err.error?.text === "function" &&
+        (detailedMessage === "Unknown error" || detailedMessage.startsWith("Request failed"))
+      ) {
+        try {
+          const raw = await err.error.clone().text();
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              detailedMessage =
+                String(
+                  parsed?.message ||
+                  parsed?.error ||
+                  parsed?.details ||
+                  parsed?.code ||
+                  ""
+                ).trim() || detailedMessage;
+            } catch {
+              detailedMessage = raw.trim() || detailedMessage;
+            }
+          }
+        } catch {
+          // Ignore parsing errors and keep fallback message.
+        }
+      }
+
+      console.error("[ADMIN_DELETE] rpc-failed", {
+        traceId,
+        username,
+        userId,
+        error: err,
+        message: err?.message,
+        status: err?.status,
+        statusCode: err?.statusCode,
+        response: err?.response,
+        responseBody: err?.response?.body,
+      });
+      setStatusMessage(`Failed to delete "${username}": ${detailedMessage} (traceId: ${traceId})`);
     } finally {
       setDeletingId(null);
     }
