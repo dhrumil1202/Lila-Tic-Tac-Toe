@@ -140,7 +140,7 @@ export default function LobbyPage({ session, setPage, setMatchId, setSocket, set
     setStatusText(`Opening realtime connection for ${selectedMode} mode...`);
     setIsSearching(true);
 
-    const socket = client.createSocket(false, false);
+    const socket = client.createSocket(window.location.protocol === "https:", false);
     console.info("[DBG][Lobby] Created socket for matchmaking");
     socketRef.current = socket;
 
