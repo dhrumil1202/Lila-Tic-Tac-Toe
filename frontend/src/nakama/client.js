@@ -196,7 +196,7 @@ export function clearSessionStorage() {
 }
 
 export function normalizeUsername(value) {
-  return String(value || "").trim();
+  return String(value || "").trim().toLowerCase();
 }
 
 function getOrCreateDeviceId() {
@@ -342,18 +342,14 @@ export async function authenticateWithPassword(displayName, password) {
     throw new Error("Password is required.");
   }
 
-  if (secret.length < 8) {
-    throw new Error("Password must be at least 8 characters.");
-  }
-
   const email = toLocalEmail(username);
 
   let session = null;
   try {
     session = await retryTransientAuth(function () {
-      return client.authenticateEmail(email, secret, false, username, {
-        displayName: username,
-      });
+      // For login, authenticate using email+password only.
+      // Passing username when create=false can cause mismatches on legacy accounts.
+      return client.authenticateEmail(email, secret, false);
     }, 2);
   } catch (loginError) {
     if (isInvalidCredentialsError(loginError) || isAccountNotFoundError(loginError)) {

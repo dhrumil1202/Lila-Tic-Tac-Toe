@@ -4,8 +4,27 @@ import {
   normalizeUsername,
 } from "../nakama/client";
 
-function toFriendlyAuthError(authError) {
-  const message = String(authError?.message || "");
+async function toFriendlyAuthError(authError) {
+  let message = String(authError?.message || "");
+
+  // Nakama JS can surface fetch failures as authError.error (Response) with empty message.
+  if (!message && authError?.error && typeof authError.error?.text === "function") {
+    try {
+      const raw = await authError.error.clone().text();
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          message = String(parsed?.message || parsed?.error || parsed?.details || "");
+        } catch {
+          message = raw;
+        }
+      }
+    } catch {
+      // Ignore parse failures and use fallback mapping below.
+    }
+  }
+
+  message = String(message || "").trim();
   const lower = message.toLowerCase();
 
   if (
@@ -86,7 +105,8 @@ export default function LoginPage({
       setPlayerName(result.username);
       setPage("lobby");
     } catch (authError) {
-      setError(toFriendlyAuthError(authError));
+      const friendlyError = await toFriendlyAuthError(authError);
+      setError(friendlyError);
     } finally {
       setIsLoading(false);
     }
