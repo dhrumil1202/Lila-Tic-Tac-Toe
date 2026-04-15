@@ -1003,9 +1003,13 @@ function rpcGetLeaderboard(ctx, logger, nk, payload) {
 		if (typeof wins !== "number" || wins <= 0) {
 			wins = record.score || 0;
 		}
+		var displayName = record.username || record.display_name || record.displayName || "Player";
+		if (String(displayName || "").toLowerCase() === String(ADMIN_USERNAME || "").toLowerCase()) {
+			continue;
+		}
 		top.push({
 			ownerId: topOwnerId,
-			displayName: record.username || record.display_name || record.displayName || "Player",
+			displayName: displayName,
 			score: record.score || 0,
 			rank: record.rank || i + 1,
 			wins: wins,

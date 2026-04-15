@@ -1,11 +1,8 @@
 import { useState } from "react";
-import {
-  authenticateWithPassword,
-  normalizeUsername,
-} from "../nakama/client";
+import { registerWithPassword, normalizeUsername } from "../nakama/client";
 
-function toFriendlyAuthError(authError) {
-  const message = String(authError?.message || "");
+function toFriendlyRegisterError(err) {
+  const message = String(err?.message || "");
   const lower = message.toLowerCase();
 
   if (
@@ -21,46 +18,26 @@ function toFriendlyAuthError(authError) {
     return "Could not reach authentication service. Please try again in a few seconds.";
   }
 
-  if (lower.includes("device-only account") || lower.includes("another device/browser")) {
-    return "This username is tied to a device-only account on another device/browser. Use that original device, or set a password there to use this account everywhere.";
-  }
-
-  if (lower.includes("already exists on another account")) {
-    return "This username is already linked elsewhere. Use its original password.";
-  }
-
-  if (lower.includes("username already exists") || lower.includes("choose another username")) {
-    return "This username already exists. Use the original password or try another username.";
-  }
-
-  if (lower.includes("username") && (lower.includes("already") || lower.includes("exists") || lower.includes("in use"))) {
-    return "That username is already taken. Please choose another one.";
-  }
-
-  if (lower.includes("username") && (lower.includes("invalid") || lower.includes("must"))) {
-    return "Invalid username. Use letters, numbers, underscore, dash, or dot.";
-  }
-
-  if (lower.includes("invalid credentials") || lower.includes("password")) {
-    return "Invalid username/password. Please try again.";
+  if (lower.includes("already taken") || lower.includes("already exists") || lower.includes("choose another")) {
+    return "That username is already taken. Please choose another.";
   }
 
   if (lower.includes("at least 8 characters")) {
     return "Password must be at least 8 characters.";
   }
 
-  return message || "Authentication failed.";
+  if (lower.includes("username") && (lower.includes("invalid") || lower.includes("must"))) {
+    return "Invalid username. Use letters, numbers, underscore, dash, or dot.";
+  }
+
+  return message || "Registration failed. Please try again.";
 }
 
-export default function LoginPage({
-  playerName,
-  setPlayerName,
-  setPage,
-  setSession,
-}) {
+export default function RegisterPage({ playerName, setPlayerName, setPage, setSession }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -77,16 +54,26 @@ export default function LoginPage({
       return;
     }
 
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setIsLoading(true);
     setError("");
 
     try {
-      const result = await authenticateWithPassword(displayName, password);
+      const result = await registerWithPassword(displayName, password);
       setSession(result.session);
       setPlayerName(result.username);
       setPage("lobby");
-    } catch (authError) {
-      setError(toFriendlyAuthError(authError));
+    } catch (registerError) {
+      setError(toFriendlyRegisterError(registerError));
     } finally {
       setIsLoading(false);
     }
@@ -96,43 +83,53 @@ export default function LoginPage({
     <main style={styles.page}>
       <section style={styles.card}>
         <p style={styles.kicker}>Lila Tic-Tac-Toe</p>
-        <h1 style={styles.title}>Login</h1>
-        <p style={styles.subtitle}>Welcome back. Enter your credentials to continue.</p>
+        <h1 style={styles.title}>Create Account</h1>
+        <p style={styles.subtitle}>Choose a username and password to get started.</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <label htmlFor="displayName" style={styles.label}>Username</label>
-        <input
-          id="displayName"
-          type="text"
-          value={playerName}
-          onChange={(event) => setPlayerName(event.target.value)}
-          placeholder="Enter username (e.g. lila_player_1)"
-          disabled={isLoading}
-          style={styles.input}
-        />
+          <input
+            id="displayName"
+            type="text"
+            value={playerName}
+            onChange={(event) => setPlayerName(event.target.value)}
+            placeholder="Enter username (e.g. lila_player_1)"
+            disabled={isLoading}
+            style={styles.input}
+          />
           <label htmlFor="password" style={styles.label}>Password</label>
           <input
             id="password"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Enter password (min 8 characters)"
+            placeholder="Min 8 characters"
+            disabled={isLoading}
+            style={styles.input}
+          />
+          <label htmlFor="confirmPassword" style={styles.label}>Confirm Password</label>
+          <input
+            id="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            placeholder="Re-enter your password"
             disabled={isLoading}
             style={styles.input}
           />
           <button type="submit" disabled={isLoading} style={styles.button}>
-            {isLoading ? "Logging in..." : "Login"}
+            {isLoading ? "Creating Account..." : "Create Account"}
           </button>
         </form>
 
         <p style={styles.hint}>
-          New here?{" "}
+          Already have an account?{" "}
           <button
             type="button"
-            onClick={() => setPage("register")}
+            onClick={() => setPage("login")}
             style={styles.link}
           >
-            Create an account
+            Log in
           </button>
         </p>
 

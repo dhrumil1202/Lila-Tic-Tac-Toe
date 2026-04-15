@@ -329,6 +329,7 @@ async function retryTransientAuth(operation, maxAttempts) {
   throw lastError || new Error("Authentication failed.");
 }
 
+// Login only — does NOT create accounts.
 export async function authenticateWithPassword(displayName, password) {
   const username = normalizeUsername(displayName);
   const secret = String(password || "");
@@ -346,8 +347,8 @@ export async function authenticateWithPassword(displayName, password) {
   }
 
   const email = toLocalEmail(username);
-  let session = null;
 
+  let session = null;
   try {
     session = await retryTransientAuth(function () {
       return client.authenticateEmail(email, secret, false, username, {
@@ -355,68 +356,57 @@ export async function authenticateWithPassword(displayName, password) {
       });
     }, 2);
   } catch (loginError) {
-    if (isInvalidCredentialsError(loginError)) {
-      throw new Error("Invalid username/password.");
+    if (isInvalidCredentialsError(loginError) || isAccountNotFoundError(loginError)) {
+      throw new Error("Invalid username or password.");
     }
-
-    if (!isAccountNotFoundError(loginError)) {
-      throw loginError;
-    }
-
-    try {
-      session = await retryTransientAuth(function () {
-        return client.authenticateEmail(email, secret, true, username, {
-          displayName: username,
-        });
-      }, 2);
-    } catch (createError) {
-      if (!isUsernameTakenError(createError)) {
-        throw createError;
-      }
-
-      // Migrate current browser's device account to password auth when username already exists.
-      const deviceId = getOrCreateDeviceId();
-      let deviceSession = null;
-
-      try {
-        deviceSession = await retryTransientAuth(function () {
-          return client.authenticateDevice(deviceId, false, username, {
-            displayName: username,
-          });
-        }, 2);
-      } catch (deviceError) {
-        throw new Error(
-          "Username already exists. Use the original password for this username, or choose another username."
-        );
-      }
-
-      const account = await client.getAccount(deviceSession);
-      const deviceUsername = normalizeUsername(account?.user?.username);
-
-      if (deviceUsername !== username) {
-        throw new Error(
-          "Username already exists. Use the original password for this username, or choose another username."
-        );
-      }
-
-      await client.updateAccount(deviceSession, {
-        email,
-        password: secret,
-        username,
-        display_name: username,
-      });
-
-      session = await retryTransientAuth(function () {
-        return client.authenticateEmail(email, secret, false, username, {
-          displayName: username,
-        });
-      }, 2);
-    }
+    throw loginError;
   }
 
+  // Save encrypted session to localStorage
+  await saveSessionToStorage(session, username);
+  await ensurePlayerStats(session);
+
+  return {
+    session,
+    username: normalizeUsername((await client.getAccount(session))?.user?.username) || username,
+  };
+}
+
+// Register only — creates a new account. Fails if username already exists.
+export async function registerWithPassword(displayName, password) {
+  const username = normalizeUsername(displayName);
+  const secret = String(password || "");
+
+  if (!username) {
+    throw new Error("Username is required.");
+  }
+
+  if (secret.length < 8) {
+    throw new Error("Password must be at least 8 characters.");
+  }
+
+  const email = toLocalEmail(username);
+
+  let session = null;
+  try {
+    session = await retryTransientAuth(function () {
+      return client.authenticateEmail(email, secret, true, username, {
+        displayName: username,
+      });
+    }, 2);
+  } catch (createError) {
+    if (isUsernameTakenError(createError)) {
+      throw new Error("That username is already taken. Please choose another.");
+    }
+    if (isInvalidCredentialsError(createError) || !isAccountNotFoundError(createError) && String(createError?.message || "").toLowerCase().includes("already")) {
+      throw new Error("That username is already taken. Please choose another.");
+    }
+    throw createError;
+  }
+
+  // Ensure the display name is set correctly
   const account = await client.getAccount(session);
   const currentUsername = normalizeUsername(account?.user?.username);
-
   if (currentUsername !== username) {
     await client.updateAccount(session, {
       username,
@@ -424,18 +414,12 @@ export async function authenticateWithPassword(displayName, password) {
     });
   }
 
-  const refreshedSession = await retryTransientAuth(function () {
-    return client.authenticateEmail(email, secret, false, username, {
-      displayName: username,
-    });
-  }, 2);
-
-  // Save encrypted session to localStorage (no stats data)
-  await saveSessionToStorage(refreshedSession, username);
-  await ensurePlayerStats(refreshedSession);
+  // Save encrypted session to localStorage
+  await saveSessionToStorage(session, username);
+  await ensurePlayerStats(session);
 
   return {
-    session: refreshedSession,
+    session,
     username,
   };
 }

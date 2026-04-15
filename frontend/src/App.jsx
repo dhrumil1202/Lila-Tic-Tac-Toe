@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 import LobbyPage from "./pages/LobbyPage";
 import GamePage from "./pages/GamePage";
 import AdminPage from "./pages/AdminPage";
@@ -117,6 +118,10 @@ export default function App() {
 
   if (page === "login") {
     return <LoginPage {...sharedState} />;
+  }
+
+  if (page === "register") {
+    return <RegisterPage {...sharedState} />;
   }
 
   if (page === "lobby") {
