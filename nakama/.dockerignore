@@ -1,0 +1,4 @@
+data/.cookie
+*.log
+.env
+.env.local

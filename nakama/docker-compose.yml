@@ -21,11 +21,15 @@ services:
         condition: service_healthy
     environment:
       NAKAMA_DATABASE_ADDRESS: "postgres:localdb@postgres:5432/nakama"
+      NAKAMA_SERVER_KEY: "${NAKAMA_SERVER_KEY:-defaultkey}"
+      NAKAMA_CORS_ALLOW_ORIGIN: "${NAKAMA_CORS_ALLOW_ORIGIN:-http://localhost:5173}"
+      NAKAMA_SESSION_ENCRYPTION_KEY: "${NAKAMA_SESSION_ENCRYPTION_KEY:-defaultencryptionkey}"
+      NAKAMA_REFRESH_ENCRYPTION_KEY: "${NAKAMA_REFRESH_ENCRYPTION_KEY:-defaultrefreshencryptionkey}"
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
         /nakama/nakama migrate up --database.address "$${NAKAMA_DATABASE_ADDRESS}"
-        exec /nakama/nakama --name nakama1 --database.address "$${NAKAMA_DATABASE_ADDRESS}" --runtime.js_entrypoint main.js --logger.level INFO --session.token_expiry_sec 7200 --session.refresh_token_expiry_sec 604800
+        exec /nakama/nakama --name nakama1 --database.address "$${NAKAMA_DATABASE_ADDRESS}" --runtime.js_entrypoint main.js --logger.level INFO --session.token_expiry_sec 7200 --session.refresh_token_expiry_sec 604800 --socket.server_key "$${NAKAMA_SERVER_KEY}" --session.encryption_key "$${NAKAMA_SESSION_ENCRYPTION_KEY}" --session.refresh_encryption_key "$${NAKAMA_REFRESH_ENCRYPTION_KEY}" --socket.response_headers "Access-Control-Allow-Origin=$${NAKAMA_CORS_ALLOW_ORIGIN}" --socket.response_headers "Access-Control-Allow-Methods=GET,POST,PUT,DELETE,OPTIONS" --socket.response_headers "Access-Control-Allow-Headers=Authorization,Content-Type,Accept,Origin,X-Requested-With" --socket.response_headers "Access-Control-Allow-Credentials=true"
     volumes:
       - ./data:/nakama/data
     ports:

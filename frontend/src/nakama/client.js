@@ -5,8 +5,14 @@ const DEVICE_ID_STORAGE_KEY = "nakama_device_id";
 const SESSION_STORAGE_KEY = "lila_session_encrypted";
 const ENCRYPTION_SALT = "lila_tic_tac_toe_2026"; // Static salt for key derivation
 
-// In production, replace localhost with the URL of your deployed Nakama server.
-const client = new Client("defaultkey", "127.0.0.1", "7350", false);
+const NAKAMA_SERVER_KEY = import.meta.env.VITE_NAKAMA_SERVER_KEY || "defaultkey";
+const NAKAMA_HOST = import.meta.env.VITE_NAKAMA_HOST || "127.0.0.1";
+const NAKAMA_PORT = import.meta.env.VITE_NAKAMA_PORT || "7350";
+const NAKAMA_USE_SSL =
+  String(import.meta.env.VITE_NAKAMA_USE_SSL || "false").toLowerCase() ===
+  "true";
+
+const client = new Client(NAKAMA_SERVER_KEY, NAKAMA_HOST, NAKAMA_PORT, NAKAMA_USE_SSL);
 
 // Encryption utilities using Web Crypto API
 async function deriveEncryptionKey() {
