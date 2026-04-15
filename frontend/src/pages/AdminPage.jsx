@@ -115,7 +115,31 @@ export default function AdminPage({ session, playerName, setPage }) {
     setDeletingId(userId);
     setStatusMessage("");
     try {
-      const rpcResult = await client.rpc(session, "admin_delete_user", JSON.stringify(requestPayload));
+      let rpcResult = null;
+      try {
+        // Preferred: send object payload (works with single-parse backends).
+        rpcResult = await client.rpc(session, "admin_delete_user", requestPayload);
+      } catch (firstError) {
+        const firstMessage = String(firstError?.message || "").toLowerCase();
+        const shouldRetryWithStringifiedPayload =
+          firstMessage.includes("userid is required") ||
+          firstMessage.includes("invalid payload") ||
+          firstMessage.includes("json") ||
+          firstError?.status === 400 ||
+          firstError?.status === 500;
+
+        if (!shouldRetryWithStringifiedPayload) {
+          throw firstError;
+        }
+
+        console.warn("[ADMIN_DELETE] retrying with stringified payload", {
+          traceId,
+          firstError,
+        });
+
+        // Backward-compatible fallback for servers that expect a string payload.
+        rpcResult = await client.rpc(session, "admin_delete_user", JSON.stringify(requestPayload));
+      }
       let responseTraceId = traceId;
       if (typeof rpcResult?.payload === "string" && rpcResult.payload.trim()) {
         try {
