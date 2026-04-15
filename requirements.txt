@@ -1,0 +1,74 @@
+# Lila Tic-Tac-Toe — System Requirements
+#
+# This file lists all external tools and runtimes required to run the project.
+# Frontend npm package versions are managed by frontend/package.json and
+# frontend/package-lock.json — run `npm install` inside the frontend/ folder
+# to install them exactly.
+
+# ─── Host Machine ─────────────────────────────────────────────────────────────
+
+# Node.js JavaScript runtime (for frontend dev server and build tooling)
+# Minimum: 18.0.0
+# Recommended: 22.x LTS or later
+nodejs >= 18.0.0
+
+# npm package manager (bundled with Node.js)
+# Minimum: 9.0.0
+npm >= 9.0.0
+
+# Docker (container runtime for Nakama + PostgreSQL backend)
+# Docker Desktop (Windows / macOS):  https://www.docker.com/products/docker-desktop
+# Docker Engine (Linux):             https://docs.docker.com/engine/install/
+# Minimum Docker version: 24.0.0
+docker >= 24.0.0
+
+# Docker Compose (multi-container orchestration)
+# Bundled with Docker Desktop.
+# On Linux, install the Compose plugin: https://docs.docker.com/compose/install/
+# Minimum version: 2.20.0
+docker-compose >= 2.20.0
+
+# ─── Backend (runs inside Docker, no host install required) ───────────────────
+
+# Nakama game server (JavaScript runtime)
+# Image: heroiclabs/nakama:3.30.0
+nakama == 3.30.0
+
+# PostgreSQL relational database
+# Image: postgres:14
+postgresql == 14
+
+# ─── Frontend npm packages (installed via `npm install` in frontend/) ─────────
+
+# React UI library
+react == 19.x
+
+# React DOM renderer
+react-dom == 19.x
+
+# Nakama JavaScript SDK (WebSocket + HTTP client for Nakama)
+@heroiclabs/nakama-js == 2.8.0
+
+# UUID generator (used for device-auth IDs)
+uuid == 13.x
+
+# Vite build tool and dev server
+vite == 8.x
+
+# Vite plugin for React (JSX transform + fast refresh)
+@vitejs/plugin-react == 6.x
+
+# ─── Browser requirements ─────────────────────────────────────────────────────
+
+# Any modern browser with support for:
+#   - WebSockets (RFC 6455)
+#   - Web Crypto API (window.crypto.subtle) — used for local session encryption
+#   - ES2020+ (optional chaining, nullish coalescing, async/await)
+#
+# Tested on:
+#   - Chrome 120+
+#   - Firefox 121+
+#   - Edge 120+
+#
+# Not supported:
+#   - Internet Explorer (any version)

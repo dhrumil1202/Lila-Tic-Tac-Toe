@@ -1,0 +1,57 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --text: #eaf0ff;
+  --muted: #b7c7ff;
+  --danger: #ff9aa5;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+  display: block;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+input {
+  min-height: 44px;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #8fd9ff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 15px;
+  }
+}

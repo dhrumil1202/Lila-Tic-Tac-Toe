@@ -1,0 +1,16 @@
+# Nakama runtime secrets (auto-generated, must not be committed)
+nakama/data/.cookie
+
+# Environment variable files
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Frontend build output and deps (also covered by frontend/.gitignore)
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/

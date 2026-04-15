@@ -1,0 +1,28 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Dark rounded background -->
+  <rect width="48" height="48" rx="8" fill="#1a0a2e"/>
+
+  <!-- Grid lines (purple) -->
+  <line x1="16" y1="3"  x2="16" y2="45" stroke="#863bff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="32" y1="3"  x2="32" y2="45" stroke="#863bff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="3"  y1="16" x2="45" y2="16" stroke="#863bff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="3"  y1="32" x2="45" y2="32" stroke="#863bff" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- X top-left cell (center 8,8) -->
+  <line x1="3"  y1="3"  x2="13" y2="13" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="13" y1="3"  x2="3"  y2="13" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- O top-right cell (center 40,8) -->
+  <circle cx="40" cy="8" r="5" fill="none" stroke="#47bfff" stroke-width="2.5"/>
+
+  <!-- O middle-left cell (center 8,24) -->
+  <circle cx="8" cy="24" r="5" fill="none" stroke="#47bfff" stroke-width="2.5"/>
+
+  <!-- X center cell (center 24,24) -->
+  <line x1="19" y1="19" x2="29" y2="29" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="29" y1="19" x2="19" y2="29" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- X bottom-right cell (center 40,40) - winning diagonal -->
+  <line x1="35" y1="35" x2="45" y2="45" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="45" y1="35" x2="35" y2="45" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
