@@ -1067,6 +1067,23 @@ function rpcGetLeaderboard(ctx, logger, nk, payload) {
 	});
 }
 
+function rpcEnsurePlayerStats(ctx, logger, nk, payload) {
+	var userId = ctx.userId || ctx.user_id || "";
+
+	if (!userId) {
+		throw new Error("User must be authenticated.");
+	}
+
+	var statsByUser = readStatsByUserIds(nk, [userId]);
+	var stats = statsByUser[userId] || getDefaultStats();
+	writeStats(nk, userId, stats);
+
+	return JSON.stringify({
+		status: "ok",
+		stats: stats,
+	});
+}
+
 function matchmakerMatched(ctx, logger, nk, matches) {
 	debugLog(logger, "matchmakerMatched users=" + (matches ? matches.length : 0));
 	if (!matches || matches.length < 2) {
@@ -1114,6 +1131,7 @@ function InitModule(ctx, logger, nk, initializer) {
 	initializer.registerRpc("find_match", rpcFindMatch);
 	initializer.registerRpc("cancel_matchmaking", rpcCancelMatchmaking);
 	initializer.registerRpc("get_leaderboard", rpcGetLeaderboard);
+	initializer.registerRpc("ensure_player_stats", rpcEnsurePlayerStats);
 	initializer.registerMatchmakerMatched(matchmakerMatched);
 
 	logger.info("Tic-Tac-Toe modules loaded.");
